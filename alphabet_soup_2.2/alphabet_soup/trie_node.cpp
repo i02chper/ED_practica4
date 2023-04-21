@@ -175,17 +175,20 @@ TrieNode::fold(std::ostream& out) const
     //TODO
     //Hint: review c++ input/output manipulators at
     //      https://en.cppreference.com/w/cpp/io/manip
+    // Escribe el estado de este nodo en el flujo de salida.
     out << "[";
-    if(is_key()){
-        out << "T";
-    }else{
-        out<<"F";
+    if (is_key()) {
+        out << " T";
+    } else {
+        out << " F";
     }
-    for(auto const& child : children_) {
-        out << " " << std::hex << + child.first << " ";
-        child.second->fold(out<< " ");
+    if (!children_.empty()) {
+        for (auto const& child : children_) {
+            out << " " << std::hex << +child.first;
+            child.second->fold(out << " ");
+        }
     }
-    out << "]";
+    out << " ]";
     //
     return out;
 }
@@ -194,28 +197,41 @@ TrieNode::Ref TrieNode::create(std::istream& in) noexcept(false)
 {
     TrieNode::Ref node = nullptr;
     //TODO
-    std::string line;
-    std::getline(in, line);
-    if(line.empty() || line[0] != '[' || line.back() != ']')
-    {
-        throw std:: runtime_error("Wrong input format");
-    }
+    char c;
+     in >> c;
+     if (c != '[') {
+         throw std::runtime_error("Wrong input format");
+     }
 
-    bool is_key_state = false;
-    if (line[1] == 'T')
-    {
-        is_key_state = true;
-    }
+     node = std::make_shared<TrieNode>();
 
-    node = std::make_shared<TrieNode>(is_key_state);
-    std::istringstream iss (line.substr(2,line.size() - 3));
-    char symbol;
-    while (iss >> std::skipws >> symbol)
-    {
-        iss.ignore();
-        TrieNode::Ref child_node = TrieNode::create(iss);
-        node->set_child(symbol,child_node);
-    }
+     bool is_key = false; // siempre establecer is_key como false
+     in >> c;
+     if (c == 'T') {
+         is_key = true;
+     } else if (c != 'F') { // establecer is_key como false si la marca no es 'F'
+         throw std::runtime_error("Wrong input format");
+     }
+
+     while (in >> c) {
+         if (c == ']') {
+             break;
+         } else if (c == ' ') {
+             continue;
+         } else {
+             in.putback(c);
+             char hex[3];
+             in.read(hex, 2);
+             hex[2] = '\0';
+             unsigned char symbol = static_cast<unsigned char>(std::strtol(hex, nullptr, 16));
+             node->children_.emplace(symbol, TrieNode::create(in));
+         }
+     }
+
+     node->is_key_ = is_key;
+     if (c != ']') {
+         throw std::runtime_error("Wrong input format");
+     }
     //
     return node;
 }
