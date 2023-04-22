@@ -45,7 +45,35 @@ scan_cell(int row, int col, int dy, int dx, AlphabetSoup const& soup,
     //    the scan_result pair != ""), push the current cell's coordinates
     //    (row,col) into the second item of scan_result (the stack of
     //    coordinates).
-
+    if(trie->is_key()){
+        scan_result.first=trie->prefix();
+    }
+    else{
+        if(row>=0 && row<soup.rows() && col>=0 && col<soup.cols()){
+            auto const cell = soup.cell(row,col);
+            if(trie->find_symbol(cell)){
+                trie=trie->current();
+                bool found = false;
+                if(dx==0 && dy==0){
+                    for(int i=std::max(row-1,0);i<std::min(row+2,soup.rows()) && !found;i++) {
+                        for(int j=std::max(col-1,0);j<std::min(col+2,soup.cols()) && !found;j++){
+                            if(i!=row || j!=col){
+                                scan_cell(i,j,j-col,i-row,soup,trie,scan_result);
+                                found=(scan_result.first!="");
+                            }
+                        }
+                    }
+                }
+                else{
+                    scan_cell(row+dx,col+dy,dy,dx,soup,trie,scan_result);
+                    found=(scan_result.first!="");
+                }
+                if(found==true){
+                    scan_result.second.push(std::pair<int,int>(row,col));
+                }
+            }
+        }
+    }
 
 
     //

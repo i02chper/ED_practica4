@@ -18,8 +18,8 @@
 TrieNode::TrieNode (bool is_key_state)
 {
     //TODO
-    is_key_ = is_key_state;
-    iterator_ = children_.end();
+    isKey_ = is_key_state;
+    curr_ = nullptr;
     //
     assert(is_key()==is_key_state);
     assert(!current_exists());
@@ -37,7 +37,7 @@ bool TrieNode::is_key() const
 {
     bool ret_val = true;
     //TODO
-    ret_val = is_key_;
+    ret_val = isKey_;
     //
     return ret_val;
 }
@@ -47,7 +47,7 @@ TrieNode::has(char k) const
 {
     bool ret_v = false;
     //TODO
-    if (children_.count(k)!= 0)
+    if(dict_.find(k)!=dict_.end())
     {
         ret_v = true;
     }
@@ -61,7 +61,8 @@ TrieNode::child(char k) const
     assert(has(k));
     TrieNode::Ref node = nullptr;
     //TODO
-    node = children_.at(k);
+    auto auxChild=dict_;
+    node=auxChild[k];
     //
     return node;
 }
@@ -71,9 +72,18 @@ TrieNode::current_exists() const
 {
     bool ret_val = true;
     //TODO
-    if(iterator_ == children_.end())
-    {
-        ret_val = false;
+    if(curr_==nullptr){
+        ret_val=false;
+    }
+    else{
+        bool found = false;
+        for(auto i=dict_.begin();i!=dict_.end();i++){
+            if(i->second==curr_){
+                found=true;
+                break;
+            }
+        }
+        ret_val=found;
     }
     //
     return ret_val;
@@ -85,7 +95,7 @@ TrieNode::current_node() const
     assert(current_exists());
     TrieNode::Ref node = nullptr;
     //TODO
-    node = iterator_->second;
+    node = curr_;
     //
     return node;
 }
@@ -96,9 +106,11 @@ TrieNode::current_symbol() const
     assert(current_exists());
     char symbol = 0;
     //TODO
-    if(current_exists())
-    {
-        symbol = iterator_->first;
+    for(auto i = dict_.begin();i!=dict_.end();i++){
+        if(i->second ==curr_){
+            symbol = i->first;
+            break;
+        }
     }
     //
     return symbol;
@@ -108,7 +120,7 @@ void
 TrieNode::set_is_key_state(bool new_state)
 {
     //TODO
-    is_key_ = new_state;
+    isKey_ = new_state;
     //
     assert(is_key()==new_state);
 }
@@ -118,14 +130,14 @@ TrieNode::find_child(char s)
 {
     bool found = false;
     //TODO
-    if(has(s) == true)
-    {
-        iterator_ = children_.find(s);
-        found = true;
+    auto i=dict_.find(s);
+    if(i!=dict_.end()){
+        curr_=i->second;
+        found=true;
     }
     else
     {
-        iterator_ = children_.end();
+        curr_=nullptr;
     }
     //
     assert(found || !current_exists());
@@ -137,14 +149,7 @@ void
 TrieNode::goto_first_child()
 {
     //TODO
-    if(!children_.empty())
-    {
-        iterator_ = children_.begin();
-    }
-    else
-    {
-        iterator_ = children_.end();
-    }
+    curr_=dict_.begin()->second;
     //
 }
 
@@ -153,7 +158,19 @@ TrieNode::goto_next_child()
 {
     assert(current_exists());
     //TODO
-    ++iterator_;
+    for(auto i=dict_.begin();i!=dict_.end();i++)
+    {
+        if(i->second==curr_){
+            i++;
+            if(i==dict_.end()){
+                curr_=nullptr;
+            }
+            else{
+                curr_=i->second;
+            }
+            break;
+        }
+    }
     //
 }
 
@@ -162,8 +179,8 @@ TrieNode::set_child(char k, Ref node)
 {
     assert(node != nullptr);
     //TODO
-    children_[k] = node;
-    iterator_ = children_.find(k);
+    dict_[k]=node;
+    curr_=node;
     //
     assert(current_symbol()==k);
     assert(current_node()==node);
@@ -176,17 +193,17 @@ TrieNode::fold(std::ostream& out) const
     //Hint: review c++ input/output manipulators at
     //      https://en.cppreference.com/w/cpp/io/manip
     // Escribe el estado de este nodo en el flujo de salida.
-    out << "[";
-    if (is_key()) {
-        out << " T";
-    } else {
-        out << " F";
+    out << "[ ";
+    if(is_key()){
+        out << "T";
     }
-    if (!children_.empty()) {
-        for (auto const& child : children_) {
-            out << " " << std::hex << +child.first;
-            child.second->fold(out << " ");
-        }
+    else{
+        out << "F";
+    }
+
+    for(auto i=dict_.begin();i!=dict_.end();i++){
+        out << " " << std::hex << (uint16_t)i->first << " ";
+        i->second->fold(out);
     }
     out << " ]";
     //
@@ -197,41 +214,34 @@ TrieNode::Ref TrieNode::create(std::istream& in) noexcept(false)
 {
     TrieNode::Ref node = nullptr;
     //TODO
-    char c;
-     in >> c;
-     if (c != '[') {
-         throw std::runtime_error("Wrong input format");
-     }
+    std::string token;
+    in >> token;
+    if (token != "[")
+        throw std::runtime_error("Wrong input format");
 
-     node = std::make_shared<TrieNode>();
-
-     bool is_key = false; // siempre establecer is_key como false
-     in >> c;
-     if (c == 'T') {
-         is_key = true;
-     } else if (c != 'F') { // establecer is_key como false si la marca no es 'F'
-         throw std::runtime_error("Wrong input format");
-     }
-
-     while (in >> c) {
-         if (c == ']') {
-             break;
-         } else if (c == ' ') {
-             continue;
-         } else {
-             in.putback(c);
-             char hex[3];
-             in.read(hex, 2);
-             hex[2] = '\0';
-             unsigned char symbol = static_cast<unsigned char>(std::strtol(hex, nullptr, 16));
-             node->children_.emplace(symbol, TrieNode::create(in));
-         }
-     }
-
-     node->is_key_ = is_key;
-     if (c != ']') {
-         throw std::runtime_error("Wrong input format");
-     }
+    // Comprobar que existe key
+    in >> token;
+    if (token == "T")
+    {
+        node = TrieNode::create(true);
+    }
+    else if (token == "F")
+    {
+        node = TrieNode::create(false);
+    }
+    else
+    {
+        throw std::runtime_error("Wrong input format");
+    }
+    // Llamada recursiva para cada hijo
+    while (in >> token && token != "]")
+    {
+        node->set_child(char(std::stoi(token, nullptr, 16)), TrieNode::create(in));
+    }
+    if (token != "]")
+    {
+        throw std::runtime_error("Wrong input format");
+    }
     //
     return node;
 }
